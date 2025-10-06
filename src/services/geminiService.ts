@@ -1,22 +1,18 @@
 import { GoogleGenAI, GenerateContentResponse } from "@google/genai";
 import { SubtitleEntry } from '../types';
 
-// Vite exposes environment variables on the `import.meta.env` object.
-// VITE_ is a required prefix for variables to be exposed to the client-side code.
-const API_KEY = import.meta.env.VITE_GEMINI_API_KEY;
-
-if (!API_KEY) {
-    console.error("Gemini API key is not set. Please set the VITE_GEMINI_API_KEY environment variable.");
-}
-
-const ai = new GoogleGenAI({ apiKey: API_KEY! });
+// FIX: Adhere to @google/genai coding guidelines for API key initialization.
+// The API key must be obtained exclusively from `process.env.API_KEY`.
+// This also resolves the TypeScript error "Property 'env' does not exist on type 'ImportMeta'".
+const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
 
 export async function translateSubtitles(
     subtitles: SubtitleEntry[],
     targetLanguage: string
 ): Promise<SubtitleEntry[]> {
-    if (!API_KEY) {
-        throw new Error("Thiếu API key của Gemini. Vui lòng đặt biến môi trường VITE_GEMINI_API_KEY.");
+    // FIX: Update API key check to use process.env.API_KEY and provide a generic error message.
+    if (!process.env.API_KEY) {
+        throw new Error("Thiếu API key của Gemini. Vui lòng đặt biến môi trường API_KEY.");
     }
     if (subtitles.length === 0) {
         return [];
