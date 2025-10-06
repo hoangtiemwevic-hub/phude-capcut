@@ -63,3 +63,9 @@ export const CheckIcon: React.FC<React.SVGProps<SVGSVGElement>> = (props) => (
         <path stroke="currentColor" strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M1 5.917 5.724 10.5 15 1.5"/>
     </svg>
 );
+
+export const KeyIcon: React.FC = () => (
+    <svg className="w-16 h-16 text-slate-500" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" width="24" height="24" fill="none" viewBox="0 0 24 24">
+        <path stroke="currentColor" strokeLinecap="round" strokeLinejoin="round" strokeWidth="1.5" d="M10.779 17.779 4.36 19.918 6.5 13.5m4.279 4.279 8.364-8.643a3.027 3.027 0 0 0-4.279-4.279l-8.364 8.643a3.027 3.027 0 0 0 4.279 4.279Z"/>
+    </svg>
+);

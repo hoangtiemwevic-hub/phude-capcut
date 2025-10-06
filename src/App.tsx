@@ -2,31 +2,48 @@ import React, { useState, useCallback, useEffect } from 'react';
 import { SubtitleEntry, Project } from './types';
 import { parseCapCutJSON } from './services/capcutParser';
 import { generateSRTContent } from './services/srtGenerator';
-import { translateSubtitles } from './services/geminiService';
+import { validateApiKey, translateSubtitles } from './services/geminiService';
 import { discoverProjects } from './services/projectService';
 import { filterSubtitles } from './services/profanityFilter';
 import { TARGET_LANGUAGES } from './constants';
 import ProjectSelector from './components/ProjectSelector';
 import SubtitleDisplay from './components/SubtitleDisplay';
 import ActionPanel from './components/ActionPanel';
+import ApiKeyInput from './components/ApiKeyInput';
 import { LogoIcon, LoadingSpinnerIcon, CopyIcon, CheckIcon } from './components/icons';
 
 const SESSION_STORAGE_KEY = 'capcut-subtitle-session';
+const API_KEY_STORAGE_KEY = 'gemini-api-key';
+
+type AppView = 'api_key_input' | 'select_folder' | 'select_project' | 'editor';
 
 const App: React.FC = () => {
+    const [apiKey, setApiKey] = useState<string | null>(null);
+    const [isApiKeyValidating, setIsApiKeyValidating] = useState<boolean>(true);
     const [originalSubtitles, setOriginalSubtitles] = useState<SubtitleEntry[] | null>(null);
-    const [subtitles, setSubtitles] = useState<SubtitleEntry[] | null>(null); // Subtitles to display (can be filtered)
+    const [subtitles, setSubtitles] = useState<SubtitleEntry[] | null>(null);
     const [projects, setProjects] = useState<Project[]>([]);
     const [fileName, setFileName] = useState<string>('phude');
     const [error, setError] = useState<string | null>(null);
     const [isLoading, setIsLoading] = useState<boolean>(false);
     const [isTranslating, setIsTranslating] = useState<boolean>(false);
-    const [currentView, setCurrentView] = useState<'select_folder' | 'select_project' | 'editor'>('select_folder');
+    const [currentView, setCurrentView] = useState<AppView>('api_key_input');
     const [isProfanityFilterEnabled, setIsProfanityFilterEnabled] = useState(true);
     const [replacedWords, setReplacedWords] = useState<Map<string, number>>(new Map());
 
-    // Effect to load session from localStorage on initial mount
+    // Effect to check for API key on initial mount
     useEffect(() => {
+        const savedApiKey = localStorage.getItem(API_KEY_STORAGE_KEY);
+        if (savedApiKey) {
+            setApiKey(savedApiKey);
+            loadSessionOrGoToSelectFolder();
+        } else {
+            setCurrentView('api_key_input');
+        }
+        setIsApiKeyValidating(false);
+    }, []);
+
+    const loadSessionOrGoToSelectFolder = () => {
         try {
             const savedSession = localStorage.getItem(SESSION_STORAGE_KEY);
             if (savedSession) {
@@ -35,15 +52,16 @@ const App: React.FC = () => {
                     setOriginalSubtitles(savedOriginalSubtitles);
                     setFileName(savedFileName);
                     setCurrentView('editor');
+                    return;
                 }
             }
         } catch (err) {
             console.error("Failed to load session from localStorage", err);
             localStorage.removeItem(SESSION_STORAGE_KEY);
         }
-    }, []);
+        setCurrentView('select_folder');
+    };
     
-    // Effect to save session to localStorage whenever original subtitles or filename change in the editor
     useEffect(() => {
         if (currentView === 'editor' && originalSubtitles && fileName) {
             try {
@@ -55,7 +73,6 @@ const App: React.FC = () => {
         }
     }, [originalSubtitles, fileName, currentView]);
 
-    // Effect to apply/remove profanity filter whenever the toggle or original subtitles change
     useEffect(() => {
         if (!originalSubtitles) {
             setSubtitles(null);
@@ -72,6 +89,17 @@ const App: React.FC = () => {
             setReplacedWords(new Map());
         }
     }, [isProfanityFilterEnabled, originalSubtitles]);
+
+    const handleApiKeySubmit = useCallback(async (submittedKey: string) => {
+        const isValid = await validateApiKey(submittedKey);
+        if (isValid) {
+            localStorage.setItem(API_KEY_STORAGE_KEY, submittedKey);
+            setApiKey(submittedKey);
+            setCurrentView('select_folder');
+        } else {
+            throw new Error("API Key validation failed.");
+        }
+    }, []);
 
     const handleDirectorySelect = useCallback(async (files: FileList | null) => {
         if (!files || files.length === 0) {
@@ -114,7 +142,7 @@ const App: React.FC = () => {
                 setError("Không tìm thấy phụ đề nào trong dự án này. Vui lòng chọn dự án khác hoặc kiểm tra lại tệp dự án.");
                 setCurrentView('select_project');
             } else {
-                setOriginalSubtitles(parsedSubtitles); // This will trigger the filtering useEffect
+                setOriginalSubtitles(parsedSubtitles);
                 setCurrentView('editor');
             }
         } catch (err) {
@@ -127,13 +155,13 @@ const App: React.FC = () => {
     }, []);
 
     const handleTranslate = useCallback(async (targetLanguage: string) => {
-        if (!originalSubtitles) return;
+        if (!originalSubtitles || !apiKey) return;
         setIsTranslating(true);
         setError(null);
 
         try {
-            const translated = await translateSubtitles(originalSubtitles, targetLanguage);
-            setOriginalSubtitles(translated); // This will trigger the filtering useEffect
+            const translated = await translateSubtitles(originalSubtitles, targetLanguage, apiKey);
+            setOriginalSubtitles(translated);
             setFileName(prev => `${prev}-${targetLanguage.toLowerCase()}`);
         } catch (err) {
             console.error(err);
@@ -141,7 +169,7 @@ const App: React.FC = () => {
         } finally {
             setIsTranslating(false);
         }
-    }, [originalSubtitles]);
+    }, [originalSubtitles, apiKey]);
 
     const handleExport = useCallback(() => {
         if (!subtitles) return;
@@ -161,6 +189,16 @@ const App: React.FC = () => {
         setError(null);
         localStorage.removeItem(SESSION_STORAGE_KEY);
         setCurrentView('select_folder');
+    };
+
+    const handleChangeApiKey = () => {
+        setApiKey(null);
+        setOriginalSubtitles(null);
+        setProjects([]);
+        setError(null);
+        localStorage.removeItem(API_KEY_STORAGE_KEY);
+        localStorage.removeItem(SESSION_STORAGE_KEY);
+        setCurrentView('api_key_input');
     };
     
     const ReplacedWordsPanel = () => {
@@ -230,6 +268,7 @@ const App: React.FC = () => {
     };
 
     const renderHeaderButtons = () => {
+        if (!apiKey) return null;
         const baseClass = "bg-slate-700 hover:bg-slate-600/80 text-white font-semibold py-2 px-4 rounded-lg transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-offset-slate-900 focus:ring-cyan-500";
         if (currentView === 'editor') {
             return (
@@ -255,6 +294,13 @@ const App: React.FC = () => {
     }
 
     const renderContent = () => {
+        if (isApiKeyValidating) {
+            return (
+                <div className="flex flex-col items-center justify-center text-center">
+                    <LoadingSpinnerIcon />
+                </div>
+            );
+        }
         if (isLoading) {
             return (
                 <div className="flex flex-col items-center justify-center text-center">
@@ -269,6 +315,8 @@ const App: React.FC = () => {
         }
 
         switch (currentView) {
+            case 'api_key_input':
+                return <ApiKeyInput onApiKeyValidated={handleApiKeySubmit} />;
             case 'select_folder':
                 return <ProjectSelector onDirectorySelect={handleDirectorySelect} projects={[]} onProjectSelect={() => {}} />;
             case 'select_project':
@@ -287,14 +335,14 @@ const App: React.FC = () => {
                                 isProfanityFilterEnabled={isProfanityFilterEnabled}
                                 onProfanityFilterChange={setIsProfanityFilterEnabled}
                             />
-                            {isProfanityFilterEnabled && <ReplacedWordsPanel />}
+                            {isProfanityFilterEnabled && replacedWords.size > 0 && <ReplacedWordsPanel />}
                             <SubtitleDisplay subtitles={subtitles} />
                         </div>
                     );
                 }
-                return null; // Should not happen
+                return null;
             default:
-                return <p>Đã có lỗi xảy ra.</p>;
+                 return <p>Đã có lỗi xảy ra.</p>;
         }
     };
 
@@ -315,6 +363,13 @@ const App: React.FC = () => {
             
             <footer className="w-full max-w-7xl mx-auto mt-8 text-center text-slate-500 text-sm">
                 <p>Được xây dựng với React, Tailwind CSS, và Gemini API. Đây là một công cụ không chính thức.</p>
+                {apiKey && (
+                    <p className="mt-2">
+                        <button onClick={handleChangeApiKey} className="text-cyan-500 hover:text-cyan-400 underline transition-colors">
+                            Thay đổi API Key
+                        </button>
+                    </p>
+                )}
             </footer>
         </div>
     );

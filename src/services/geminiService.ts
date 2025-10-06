@@ -1,22 +1,43 @@
 import { GoogleGenAI, GenerateContentResponse } from "@google/genai";
 import { SubtitleEntry } from '../types';
 
-// FIX: Adhere to @google/genai coding guidelines for API key initialization.
-// The API key must be obtained exclusively from `process.env.API_KEY`.
-// This also resolves the TypeScript error "Property 'env' does not exist on type 'ImportMeta'".
-const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
+/**
+ * Validates a Gemini API key by making a lightweight, non-streaming call.
+ * @param apiKey The API key to validate.
+ * @returns A promise that resolves to true if the key is valid, false otherwise.
+ */
+export async function validateApiKey(apiKey: string): Promise<boolean> {
+    if (!apiKey) {
+        return false;
+    }
+    try {
+        const ai = new GoogleGenAI({ apiKey });
+        // Use a very simple and fast model/task to validate the key
+        await ai.models.generateContent({
+            model: 'gemini-2.5-flash',
+            contents: 'Hi', // A minimal prompt
+        });
+        return true;
+    } catch (error) {
+        console.error("API Key validation failed:", error);
+        return false;
+    }
+}
+
 
 export async function translateSubtitles(
     subtitles: SubtitleEntry[],
-    targetLanguage: string
+    targetLanguage: string,
+    apiKey: string,
 ): Promise<SubtitleEntry[]> {
-    // FIX: Update API key check to use process.env.API_KEY and provide a generic error message.
-    if (!process.env.API_KEY) {
-        throw new Error("Thiếu API key của Gemini. Vui lòng đặt biến môi trường API_KEY.");
+    if (!apiKey) {
+        throw new Error("Thiếu API key của Gemini.");
     }
     if (subtitles.length === 0) {
         return [];
     }
+
+    const ai = new GoogleGenAI({ apiKey });
 
     // Combine all subtitle texts into a single numbered list for an efficient API call
     const combinedText = subtitles
