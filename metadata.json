@@ -1,0 +1,5 @@
+{
+  "name": "Trình trích xuất & Dịch phụ đề CapCut",
+  "description": "Một công cụ web hiện đại để trích xuất phụ đề từ tệp dự án CapCut (`draft_content.json`), hiển thị chúng, và tùy chọn dịch sang nhiều ngôn ngữ khác nhau bằng AI trước khi xuất dưới dạng tệp SRT.",
+  "requestFramePermissions": []
+}

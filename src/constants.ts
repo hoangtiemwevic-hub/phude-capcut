@@ -1,0 +1,15 @@
+export const TARGET_LANGUAGES = [
+    { code: 'vi', name: 'Tiếng Việt' },
+    { code: 'en', name: 'Tiếng Anh' },
+    { code: 'es', name: 'Tiếng Tây Ban Nha' },
+    { code: 'fr', name: 'Tiếng Pháp' },
+    { code: 'de', name: 'Tiếng Đức' },
+    { code: 'it', name: 'Tiếng Ý' },
+    { code: 'pt', name: 'Tiếng Bồ Đào Nha' },
+    { code: 'ja', name: 'Tiếng Nhật' },
+    { code: 'ko', name: 'Tiếng Hàn' },
+    { code: 'zh-CN', name: 'Tiếng Trung (Giản thể)' },
+    { code: 'ru', name: 'Tiếng Nga' },
+    { code: 'ar', name: 'Tiếng Ả Rập' },
+    { code: 'hi', name: 'Tiếng Hindi' },
+];
